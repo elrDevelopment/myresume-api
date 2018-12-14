@@ -46,51 +46,68 @@ class User(BaseModel, db.Model):
     restId = db.Column(db.Integer,db.Sequence('user_sequence'), unique=True)
     userame = db.Column(db.String(80), unique=True)
     firstname = db.Column(db.String(80))
-    lastname = db.Column(db.String(80), unique=True)
-    login = db.relationship("login", back_populates="user")
-    membership = db.relationship("membership", back_populates="user")
-    subscription = db.relationship("subscription", back_populates="user")
-    role = db.relationship("users.role", back_populates="users.user")
+    lastname = db.Column(db.String(80))
+    login = db.relationship("users.login", uselist=False, back_populates="users.user")
+    membership = db.relationship("users.membership")
+    
    
 class Login(BaseModel, db.Model):
     __tablename__ = 'login'
     __table_args__ = {'schema':'users'}
     restId = db.Column(db.Integer,db.Sequence('login_sequence'), unique=True)
     username = db.Column(db.String(80), unique=True)
-    passwordHash = db.Column(db.String(80), unique=True)
+    passwordHash = db.Column(db.String(80))
     userId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.user.ID'),server_default=db.text("uuid_generate_v4()"))
-    parent = db.relationship("users.user", back_populates="users.login")
+    user = db.relationship("users.user", back_populates="users.login")
 
 class Memerbership(BaseModel,db.Model):
     __tablename__ = 'membership'
     __table_args__ = {'schema':'users'}
     restId = db.Column(db.Integer,db.Sequence('membership_sequence'), unique=True)
     userId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.user.ID'),server_default=db.text("uuid_generate_v4()"))
-    subscriptionId = db.Column(UUID(as_uuid=True),server_default=db.text("uuid_generate_v4()"))
+    subscriptionId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.subscription.ID'), server_default=db.text("uuid_generate_v4()"))
+    roleid = db.Column(UUID(as_uuid=True),db.ForeignKey('users.role.ID'),server_default=db.text("uuid_generate_v4()"))
+    productid = db.Column(UUID(as_uuid=True),db.ForeignKey('products.product.ID'),server_default=db.text("uuid_generate_v4()"))
     cancelledDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
+    user = db.relationship("users.user", back_populates="users.membership")
+    role = db.relationship("users.role", back_populates="users.membership")
+    product = db.relationship("products.product", back_populates="users.membership")
+    subscription = db.relationship("users.subscription", back_populates="users.membership")
+    payment = db.relationship("billing.payment")
 
-class Subscription(BaseModel,db.Model):
-    __tablename__ = 'subscription'
+class Role(BaseModel,db.Model):
+    __tablename__ = 'role'
     __table_args__ = {'schema':'users'}
-    restId = db.Column(db.Integer,db.Sequence('subscription_sequence'), unique=True)
-    productId = db.Column(UUID(as_uuid=True),server_default=db.text("uuid_generate_v4()"))
-    cancelledDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
-    renewalDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
-    userId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.user.ID'),server_default=db.text("uuid_generate_v4()"))
+    restId = db.Column(db.Integer,db.Sequence('role_sequence'), unique=True)
+    membership = db.relationship("users.membership",uselist=False, back_populates="users.role")
 
 class Product(BaseModel,db.Model):
     __tablename__ = 'product'
     __table_args__ = {'schema':'products'}
     restId = db.Column(db.Integer,db.Sequence('product_sequence'), unique=True)
-    #userId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.user.ID'),server_default=db.text("uuid_generate_v4()"))
+    displayName = db.Column(db.String(256))
+    shortName = db.Column(db.String(55))
+    description = db.Column(db.String(1500))
+    aboutText = db.Column(db.String(3500))
+    price = db.Column(db.Numeric)
+    membership = db.relationship("users.membership",uselist=False, back_populates="products.product")
 
-    
-class Role(BaseModel,db.Model):
-    __tablename__ = 'role'
+class Tier(db.Model):
+    ID =  db.Column(db.Integer,db.Sequence('tier_sequence'), primary_key=True)
+    description = db.Column(db.String(160))
+
+class Subscription(BaseModel,db.Model):
+    __tablename__ = 'subscription'
     __table_args__ = {'schema':'users'}
-    restId = db.Column(db.Integer,db.Sequence('role_sequence'), unique=True)
-    userId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.user.ID'),server_default=db.text("uuid_generate_v4()"))
-
+    restId = db.Column(db.Integer,db.Sequence('subscription_sequence'), unique=True)
+    tier = db.Column(db.Integer)
+    price = db.Column(db.Numeric)
+    discountLevel = db.Column(db.Numeric)
+    cancelledDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
+    renewalDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
+    renewalNotificationDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
+    renewalNotificationSent = db.Column(db.Boolean)
+    membership = db.relationship("users.membership", uselist=False, back_populates="users.subscription")
 
 class BillingInfo(BaseModel,db.Model):
     __tablename__ = 'information'
@@ -103,9 +120,14 @@ class Payment(BaseModel,db.Model):
     __tablename__ = 'payment'
     __table_args__ = {'schema':'billing'}
     restId = db.Column(db.Integer,db.Sequence('payment_sequence'), unique=True)
+    transactionAmount = db.Column(db.Numeric)
+    discountApplied = db.Column(db.Boolean)
+    discountAmount = db.Column(db.Numeric)
+    notified = db.Column(db.Boolean)
+    lastNotifcationSent = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
     userId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.user.ID'),server_default=db.text("uuid_generate_v4()"))
     informationId = db.Column(UUID(as_uuid=True),server_default=db.text("uuid_generate_v4()"))         
-    subscriptionId = db.Column(UUID(as_uuid=True),server_default=db.text("uuid_generate_v4()"))
+    membershipId = db.Column(UUID(as_uuid=True),db.ForeignKey('users.membership.ID'),server_default=db.text("uuid_generate_v4()"))
     paymentDate = db.Column(db.DateTime, nullable=False,default=datetime.utcnow)
     daysOverdue = db.Column(db.Integer, nullable=False,default = 0)
 
